@@ -1,0 +1,29 @@
+name: Verify Launchpad CLI retry tests on Windows
+
+on:
+  push:
+    branches: [verification/lpcli-portable-retry-windows]
+
+permissions:
+  contents: read
+
+jobs:
+  retry:
+    runs-on: windows-2025
+    timeout-minutes: 25
+    env:
+      INSTA_UPDATE: 'no'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: e3b2103297d9c2f3cb04598eb070c21bb650b23b
+          persist-credentials: false
+      - name: Inspect the checkout and select Rust
+        run: |
+          if ((git rev-parse HEAD) -ne 'e3b2103297d9c2f3cb04598eb070c21bb650b23b') { exit 1 }
+          rustup toolchain install 1.97.1 --profile minimal
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          rustup override set 1.97.1
+          rustc --version
+      - name: Run all library tests
+        run: cargo test --locked --lib
