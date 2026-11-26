@@ -1,0 +1,62 @@
+name: Verify the five signed lpcli changes
+
+on:
+  push:
+    branches: [verification/lpcli-signed-integration]
+
+permissions:
+  contents: read
+
+jobs:
+  integration:
+    name: Test (${{ matrix.os }}, ${{ matrix.feature-set }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025]
+        include:
+          - feature-set: authentication
+            flags: --all-features
+          - feature-set: anonymous-only
+            flags: --no-default-features
+        feature-set: [authentication, anonymous-only]
+    defaults:
+      run:
+        shell: bash
+    env:
+      CARGO_TERM_COLOR: never
+      INSTA_UPDATE: 'no'
+      RUSTDOCFLAGS: -D warnings
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: fd8573adf2d844e44f8215d76a48f3f8a6e9074d
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify the checkout and select Rust
+        run: |
+          test "$(git rev-parse HEAD)" = fd8573adf2d844e44f8215d76a48f3f8a6e9074d
+          test "$(git rev-parse 'HEAD^{tree}')" = 1a7f1a11f8f5690bb0065ff44c681d0c63463666
+          for signed_head in \
+            e93a921d8f79a518e74eaf89233c66da8b7da42c \
+            49eb94478a312fae7dc0a7078cf2e1abc201195d \
+            2aa1d2464ccb77fbef0597c38b5fae16e7124c82 \
+            b82c66d1a8b962c7d6e28751bba9bd466d865713 \
+            8ba4ba27e15bc5fbdf4408897c72fc36c46595f8; do
+            git merge-base --is-ancestor "$signed_head" HEAD
+          done
+          rustup toolchain install 1.97.1 --profile minimal --component rustfmt --component clippy
+          rustup override set 1.97.1
+          rustc --version --verbose
+      - name: Run the Ubuntu formatting and lint checks
+        if: runner.os == 'Linux'
+        run: |
+          cargo fmt -- --check
+          cargo clippy --locked --all-targets ${{ matrix.flags }} -- -D warnings
+          cargo doc --locked --no-deps ${{ matrix.flags }}
+      - name: Test all targets on the merged source
+        run: cargo test --locked --all-targets --no-fail-fast ${{ matrix.flags }}
+      - name: Run doctests
+        run: cargo test --locked --doc ${{ matrix.flags }}
