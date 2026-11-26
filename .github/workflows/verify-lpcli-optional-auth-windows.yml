@@ -1,0 +1,42 @@
+name: Verify Launchpad CLI on Windows
+
+on:
+  push:
+    branches: [verification/lpcli-optional-auth-windows]
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-2025
+    timeout-minutes: 25
+    name: Windows (${{ matrix.feature-set }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - feature-set: authentication
+            flags: --all-features
+          - feature-set: anonymous-only
+            flags: --no-default-features
+    env:
+      INSTA_UPDATE: 'no'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 7a4b17dcac9ad01fccd83e5f6755c90d27b49faf
+          persist-credentials: false
+      - name: Inspect the checkout and select Rust
+        run: |
+          if ((git rev-parse HEAD) -ne '7a4b17dcac9ad01fccd83e5f6755c90d27b49faf') { exit 1 }
+          rustup toolchain install 1.97.1 --profile minimal
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          rustup override set 1.97.1
+          rustc --version
+      - name: Build the contribution
+        run: cargo build --locked --all-targets ${{ matrix.flags }}
+      - name: Run the test suite
+        run: cargo test --locked --all-targets ${{ matrix.flags }}
+      - name: Run doctests
+        run: cargo test --locked --doc ${{ matrix.flags }}
