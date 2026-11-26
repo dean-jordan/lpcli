@@ -1,0 +1,29 @@
+name: Verify Launchpad CLI download snapshots on Windows
+
+on:
+  push:
+    branches: [verification/lpcli-portable-snapshots-windows]
+
+permissions:
+  contents: read
+
+jobs:
+  snapshots:
+    runs-on: windows-2025
+    timeout-minutes: 25
+    env:
+      INSTA_UPDATE: 'no'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 80568724492c165ba24db00e1a74758fad971e20
+          persist-credentials: false
+      - name: Inspect the checkout and select Rust
+        run: |
+          if ((git rev-parse HEAD) -ne '80568724492c165ba24db00e1a74758fad971e20') { exit 1 }
+          rustup toolchain install 1.97.1 --profile minimal
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          rustup override set 1.97.1
+          rustc --version
+      - name: Run all CLI unit tests without updating snapshots
+        run: cargo test --locked --bin lpcli
