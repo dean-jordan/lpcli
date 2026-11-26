@@ -1,0 +1,40 @@
+name: Verify combined Launchpad CLI changes on Windows
+
+on:
+  push:
+    branches: [verification/lpcli-windows-combined]
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-2025
+    timeout-minutes: 25
+    name: Windows combined (${{ matrix.feature-set }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - feature-set: authentication
+            flags: --all-features
+          - feature-set: anonymous-only
+            flags: --no-default-features
+    env:
+      INSTA_UPDATE: 'no'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 2d83c930ee3d70bd904d98c51bba14dcf5c25bb1
+          persist-credentials: false
+      - name: Inspect the checkout and select Rust
+        run: |
+          if ((git rev-parse HEAD) -ne '2d83c930ee3d70bd904d98c51bba14dcf5c25bb1') { exit 1 }
+          rustup toolchain install 1.97.1 --profile minimal
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          rustup override set 1.97.1
+          rustc --version
+      - name: Run the tests in the merged tree
+        run: cargo test --locked --all-targets --no-fail-fast ${{ matrix.flags }}
+      - name: Run doctests
+        run: cargo test --locked --doc ${{ matrix.flags }}
