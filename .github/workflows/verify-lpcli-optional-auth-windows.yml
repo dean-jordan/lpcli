@@ -18,25 +18,32 @@ jobs:
         include:
           - feature-set: authentication
             flags: --all-features
+            revision: 7a4b17dcac9ad01fccd83e5f6755c90d27b49faf
           - feature-set: anonymous-only
             flags: --no-default-features
+            revision: 7a4b17dcac9ad01fccd83e5f6755c90d27b49faf
+          - feature-set: upstream baseline
+            flags: ''
+            revision: 53a34839f24e9c8656a9009a62bc955521dcc44e
     env:
       INSTA_UPDATE: 'no'
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 7a4b17dcac9ad01fccd83e5f6755c90d27b49faf
+          ref: ${{ matrix.revision }}
           persist-credentials: false
       - name: Inspect the checkout and select Rust
         run: |
-          if ((git rev-parse HEAD) -ne '7a4b17dcac9ad01fccd83e5f6755c90d27b49faf') { exit 1 }
+          if ((git rev-parse HEAD) -ne '${{ matrix.revision }}') { exit 1 }
           rustup toolchain install 1.97.1 --profile minimal
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           rustup override set 1.97.1
           rustc --version
       - name: Build the contribution
+        id: build
         run: cargo build --locked --all-targets ${{ matrix.flags }}
       - name: Run the test suite
-        run: cargo test --locked --all-targets ${{ matrix.flags }}
+        run: cargo test --locked --all-targets --no-fail-fast ${{ matrix.flags }}
       - name: Run doctests
+        if: always() && steps.build.outcome == 'success'
         run: cargo test --locked --doc ${{ matrix.flags }}
